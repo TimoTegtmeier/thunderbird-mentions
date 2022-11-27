@@ -71,7 +71,7 @@ async function onKeyDown(event) {
             if(val.length >= 3) {
                 // Search when the box is over 3 characters
                 cleanResults();
-                results = (await searchResults(val)).filter(x => x.properties.PrimaryEmail != undefined);
+                results = await searchResults(val);
                 await listResults(results);
                 markResult();
             }

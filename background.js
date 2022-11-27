@@ -69,7 +69,7 @@ async function handleMessage(request, sender) {
 //       search for sure :).
 function searchResults(v) {
     let results = contacts.filter((x) => { 
-       if(x.properties && x.properties.DisplayName) {
+       if(x.properties && x.properties.DisplayName && x.properties.PrimaryEmail) {
           return ( x.properties.DisplayName.toLowerCase().indexOf(v) >= 0 || 
                       (x.properties.PrimaryEmail && x.properties.PrimaryEmail.toLowerCase().indexOf(v) >= 0))
        } else {
