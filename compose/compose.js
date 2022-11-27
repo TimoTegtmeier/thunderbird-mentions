@@ -36,7 +36,10 @@ async function onKeyDown(event) {
             // Move up on the list.
             resultsIndex = (resultsIndex > 1) ? resultsIndex - 1 : resultsIndex;
             markResult();
-        } else if(key === 'Control' || key === 'Alt' || key === 'Caps Lock' || key === 'Shift' || key === 'OS' || key === 'F1' || key === 'F2' || key === 'F3' || key === 'F4' || key === 'F5' || key === 'F6' || key === 'F7' || key === 'F8' || key === 'F9' || key === 'F10' || key === 'F11' || key === 'F12') {
+        } else if(key === 'Control' || key === 'Alt' || key === 'Caps Lock' || key === 'Shift' || key === 'OS' ||
+                  key === 'F1' || key === 'F2' || key === 'F3' || key === 'F4' || key === 'F5' || key === 'F6' ||
+                  key === 'F7' || key === 'F8' || key === 'F9' || key === 'F10' || key === 'F11' || key === 'F12' ||
+                  key === 'ArrowLeft' || key === 'ArrowRight') {
             // Do Nothing.
         } else if(key === 'Enter') {
             if(results.length > 0) {
@@ -68,7 +71,7 @@ async function onKeyDown(event) {
             if(val.length >= 3) {
                 // Search when the box is over 3 characters
                 cleanResults();
-                results = await searchResults(val);
+                results = (await searchResults(val)).filter(x => x.properties.PrimaryEmail != undefined);
                 await listResults(results);
                 markResult();
             }
@@ -96,8 +99,14 @@ async function onKeyDown(event) {
         }
 
         // Forget other key presses that don't affect the content.
-        if(event.key != 'Shift' && event.key != 'OS' && event.key != 'Alt' && event.key != 'AltGraph' ) {
-            lastChar = event.key;
+        let isAltGraph = event.key == 'AltGraph';
+        if(isAltGraph && lastChar == 'Control') {
+            lastChar = '';
+        } else {
+            let ignoreKey = event.key == 'Shift' || event.key == 'OS' || event.key == 'Alt' || isAltGraph;
+            if(!ignoreKey) {
+                lastChar = event.key;
+            }
         }
     }
     return false;
@@ -211,10 +220,8 @@ async function buildContact(contact) {
         removeSearchBox();
     
         insertFullComponent(contact)
-            .then(addFinalSpace);
-
-            // Bulk Add 
-            //.then((c) => { return addContactsToCC([c]); });
+            .then(addFinalSpace)
+            .then((c) => { return addContactsToCC([c]); });
     })
     return c;
  }
