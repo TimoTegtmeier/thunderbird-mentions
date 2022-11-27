@@ -21,6 +21,7 @@ async function onKeyDown(event) {
     if(searchBoxExist) {
         let key = event.key;
         let input = document.getElementById('searchContact');
+        let isPrintableCharacter = String.fromCharCode(event.keyCode).match(/(\w|\s)/g);
 
         // Don't print the key on the body.
         event.stopPropagation();
@@ -36,36 +37,25 @@ async function onKeyDown(event) {
             // Move up on the list.
             resultsIndex = (resultsIndex > 1) ? resultsIndex - 1 : resultsIndex;
             markResult();
-        } else if(key === 'Control' || key === 'Alt' || key === 'Caps Lock' || key === 'Shift' || key === 'OS' ||
-                  key === 'F1' || key === 'F2' || key === 'F3' || key === 'F4' || key === 'F5' || key === 'F6' ||
-                  key === 'F7' || key === 'F8' || key === 'F9' || key === 'F10' || key === 'F11' || key === 'F12' ||
-                  key === 'ArrowLeft' || key === 'ArrowRight') {
-            // Do Nothing.
+        } else if(key === 'Backspace') {
+            if(input.value.length > 0) {
+                input.setAttribute('value', input.value.slice(0, input.value.length - 1));
+            } else {
+                // Close the Searchbox.
+                removeSearchBox();
+            }
+        } else if(key === 'Space' || key === ' ') {
+            // Only add Space after the first letter.
+            if(input.value.length > 0) {
+                input.setAttribute('value', input.value + ' ');
+            }
         } else if(key === 'Enter') {
             if(results.length > 0) {
                 $('#' + results[resultsIndex - 1].id).trigger('click');
             } 
-        } else {
-            // Logic will depend on value of input field.
-            let value = input.value;
-
-            // Take care of Space and backspace first.
-            if(key === 'Backspace') {
-                if(value.length > 0) {
-                    input.setAttribute('value', input.value.slice(0,input.value.length - 1));
-                } else {
-                    // Close the Searchbox.
-                    removeSearchBox();
-                }
-            } else if(key === 'Space' || key === ' ') {
-                // Only add Space after the first letter.
-                if(value.length > 0) {
-                    input.setAttribute('value', input.value + ' ');
-                }
-            } else {
-                // Print the key on the box.
-                input.setAttribute('value', input.value + key);
-            }
+        } else if(isPrintableCharacter) {
+            // Print the key on the box.
+            input.setAttribute('value', input.value + key);
 
             let val = input.value;
             if(val.length >= 3) {
