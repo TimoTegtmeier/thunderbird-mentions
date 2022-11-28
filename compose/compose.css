@@ -2,14 +2,30 @@
     --background-color: #ffffff;
     --background-search: #ffffff;
     --border-search: #606060;
+    --text-color: #000;
 
     --contact-list-background: #f4f4f4;
     --contact-list-background-hover: #ec7311;
     --contact-list-text-hover: #ffffff;
-    --contact-list-border-top-hover: #f8bc8b;
-    --contact-list-border-bottom-hover: #b1570e;
-    --contact-border-bottom: #d0d0d0;
-    --contact-border-top: #ffffff;
+    
+    --contact-border-hover: var(--border-search);
+    --contact-border: var(--border-search);
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --background-color: rgb(66, 65, 77);
+        --background-search: rgb(66, 65, 77);
+        --border-search: rgb(143, 143, 157);
+        --text-color: rgb(251, 251, 254);
+
+        --contact-list-background: rgb(66, 65, 77);
+        --contact-list-background-hover: rgb(82, 82, 94);
+        --contact-list-text-hover: var(--text-color);
+        
+        --contact-border-hover: var(--border-search);
+        --contact-border: var(--border-search);
+    }
 }
 
 span.searchBox {
@@ -20,8 +36,8 @@ span.searchBox {
 #resultsWrapper {
     position: absolute;
     z-index: 1000;
-    max-width: 300px;
-    background: white;
+    max-width: 350px;
+    background: var(--background-color);
     margin-top: 22px;
 }
 
@@ -31,10 +47,10 @@ span.searchBox {
 }
 
 input[type="text"] {
+    color: var(--text-color);
     background-color: var(--background-search);
     border: 0px solid var(--background-search);
     border-bottom: 0px solid var(--border-search);
-    font-weight: bold;
 }
 
 input.search {
@@ -42,7 +58,7 @@ input.search {
 }
 
 ul.results {
-    width: 300px;
+    width: 350px;
     list-style-type: none;
     margin: 0;
     padding: 0;
@@ -53,22 +69,17 @@ ul.results li {
 }
 
 li.contact {
+    color: var(--text-color);
     background-color: var(--contact-list-background);
-    border-top: 1px solid var(--contact-border-top);
-    border-bottom: 1px solid var(--contact-border-bottom);
+    border: 1px solid var(--contact-border);
     padding: .5em;
     padding-left: .5em;
 }
 
-li.contact:hover {
-    background: var(--contact-list-background-hover);
-    color: var(--contact-list-text-hover);
-    border-top: 1px solid var(--contact-list-border-top-hover);
-    border-bottom: 1px solid var(--contact-list-border-bottom-hover);
-    cursor: pointer;
-}
-
+li.contact:hover,
 li.selected {
-    color: var(--contact-list-text-hover);
     background: var(--contact-list-background-hover);
+    color: var(--contact-list-text-hover);
+    border: 1px solid var(--contact-border-hover);
+    cursor: pointer;
 }
