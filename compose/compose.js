@@ -82,50 +82,15 @@ async function onKeyDown(event) {
             // Don't print the @
             event.stopPropagation();
             event.preventDefault();
-        } else if(lastChar === 'Control' && event.key === 'j') {
-            // Push the contacts to the CC.
-            parseContactsInBody()
-                .then(addContactsToCC);
         }
 
         // Forget other key presses that don't affect the content.
-        let isAltGraph = event.key == 'AltGraph';
-        if(isAltGraph && lastChar == 'Control') {
-            lastChar = '';
-        } else {
-            let ignoreKey = event.key == 'Shift' || event.key == 'OS' || event.key == 'Alt' || isAltGraph;
-            if(!ignoreKey) {
-                lastChar = event.key;
-            }
+        let ignoreKey = event.key == 'Shift' || event.key == 'OS' || event.key == 'Alt' || event.key == 'AltGraph' || event.key == 'Control';
+        if(!ignoreKey) {
+            lastChar = event.key;
         }
     }
     return false;
-}
-
-// Retrieve all Contacts on the Document
-// Note:
-// We cannot rely on the tracking here as the user can
-// delete a contact and we wouldn't be able to know.
-function parseContactsInBody() {
-    let parse = new Promise((resolve, reject) => {
-        let contacts = $('a.mentionContact');
-        let contactsParsed = [];
-        
-        for(var c=0; c<contacts.length; c++) {
-            let email = $(contacts[c]).attr('data-email');
-            let name = $(contacts[c]).attr('data-name');
-            let id = $(contacts[c]).attr('data-id');
-            contactsParsed.push({
-                name,
-                email,
-                id
-            })
-        }
-
-        resolve(contactsParsed);
-    });
-    
-    return parse;
 }
 
 // Send Message to add contact.
@@ -264,10 +229,10 @@ function insertFullComponent(contact) {
     const inject = new Promise((resolve, reject) => {
 
         // Properties brought from the Popup.
-        let url = contact.url;
+        let url = "mailto:" + contact.email;
         let name = contact.name;
         let email = contact.email;
-        let id = contact.id;
+        let id = generateLinkId();
 
         let span = document.createElement('span');
 
@@ -277,7 +242,6 @@ function insertFullComponent(contact) {
         str.setAttribute('data-email', email);
         str.setAttribute('data-name', name);
         
-        str.className = 'mentionContact';
         str.id = id;
         str.innerText = '@' + name;
 
@@ -296,3 +260,11 @@ function insertFullComponent(contact) {
     return inject;    
 }
 
+function generateLinkId() {
+    return "OWAAM" +
+        ([1e7]+1e3+4e3+8e3+1e11)
+            .replace(/[018]/g, c => (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4)
+            .toString(16)
+            .toUpperCase()) +
+        "Z";
+}
