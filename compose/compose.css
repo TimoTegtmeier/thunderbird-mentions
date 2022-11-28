@@ -39,6 +39,8 @@ span.searchBox {
     max-width: 350px;
     background: var(--background-color);
     margin-top: 22px;
+    display: table;
+    border-collapse: collapse;
 }
 
 #resultsWrapper label,
