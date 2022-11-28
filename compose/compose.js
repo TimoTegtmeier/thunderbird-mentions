@@ -1,4 +1,4 @@
-console.log('Mention JS loaded.');
+console.log('@Contact Mention - Compose Script loaded.');
 
 let books = [];
 
@@ -11,7 +11,7 @@ let lastChar = '';
 
 // Search control
 let results = [];
-let resultsIndex = 1;
+let resultsIndex = 0;
 
 // Track keystrokes.
 async function onKeyDown(event) {
@@ -31,11 +31,11 @@ async function onKeyDown(event) {
             removeSearchBox();
         } else if(key === 'ArrowDown' && results.length) {
             // Move down on the list.
-            resultsIndex = (resultsIndex < results.length) ? resultsIndex + 1 : resultsIndex;
+            resultsIndex = (resultsIndex < results.length - 1) ? resultsIndex + 1 : 0;
             markResult();
         } else if(key === 'ArrowUp' && results.length) {
             // Move up on the list.
-            resultsIndex = (resultsIndex > 1) ? resultsIndex - 1 : resultsIndex;
+            resultsIndex = (resultsIndex > 0) ? resultsIndex - 1 : results.length - 1;
             markResult();
         } else if(key === 'Backspace') {
             if(input.value.length > 0) {
@@ -51,7 +51,7 @@ async function onKeyDown(event) {
             }
         } else if(key === 'Enter') {
             if(results.length > 0) {
-                $('#' + results[resultsIndex - 1].id).trigger('click');
+                $('#am-li-' + results[resultsIndex].id).trigger('click');
             } 
         } else if(isPrintableCharacter) {
             // Print the key on the box.
@@ -94,48 +94,43 @@ async function onKeyDown(event) {
 }
 
 // Send Message to add contact.
-function addContactsToCC(contacts) {
-    return browser.runtime.sendMessage({ addContactsToCC: contacts });
+function addContacts(contacts) {
+    console.log("Adding contacts", contacts);
+    return browser.runtime.sendMessage({ addContacts: contacts });
 }
 
 // Ask background for matches.
 async function searchResults(v) {
     let resultContacts = await browser.runtime.sendMessage({ searchContact: v });
+    console.log("Found contacts", resultContacts);
     return resultContacts;
  }
 
 // Remove the Search Box.
 function removeSearchBox() {
-    // Remove Box.
-    let box = document.getElementById('searchBox');
-    // Remove the box.
-    box.remove();
+    document.getElementById('searchBox').remove();
 }
 
 // Clean Results from Search
 function cleanResults() {
     results = [];
-    resultsIndex = 1;
-    let list = document.getElementById('results');
-    list.innerHTML = '';
+    resultsIndex = 0;
+    document.getElementById('results').innerHTML = '';
  }
  
  // List results on the box.
- async function listResults(r) {
+ async function listResults(contacts) {
     // Mark the Box...
     let list = document.getElementById('results');
-    for(var i in r) {
-       let result = await buildContact(r[i]);
+    for(var contact of contacts) {
+       let result = await buildContact(contact);
        $(list).append(result);
     }
  }
  
  // Clear any marked results.
  async function clearMarkedResults() {
-    let li = document.getElementsByClassName('contact');
-    for(var i in li) {
-        $(li).removeClass('selected');
-    }
+    $('li.contact').removeClass('selected');
  }
  
  // Mark a result from the list.
@@ -144,7 +139,7 @@ function cleanResults() {
  
     // If there are results, then mark.
     if(results.length) {
-        let l = document.getElementById(results[resultsIndex - 1].id);   
+        let l = document.getElementById("am-li-" + results[resultsIndex].id);   
         $(l).addClass('selected');
     }
  }
@@ -152,32 +147,16 @@ function cleanResults() {
 // Builds a contact.
 async function buildContact(contact) {
     let c = document.createElement('li');
-    c.id = contact.id;
+    c.id = "am-li-" + contact.id;
     c.className = 'contact';
-    c.innerHTML = contact.properties.DisplayName + ' (' + contact.properties.PrimaryEmail + ')';
-    c.setAttribute('data-name', contact.properties.DisplayName);
-    c.setAttribute('data-url', 'mailto:' + contact.properties.PrimaryEmail);
-    c.setAttribute('data-email', contact.properties.PrimaryEmail);
+    c.innerHTML = contact.name + ' (' + contact.email + ')';
  
-    $(c).on('click', function(event) {
-        let timestamp = (new Date()).getTime();
-        let name = $(this).attr('data-name');
-        let url = $(this).attr('data-url');
-        let email = $(this).attr('data-email');
-        let id = $(this).attr('id') + '-' + timestamp;
-        let contact = {
-            email,
-            name,
-            url,
-            id
-        }
-    
+    $(c).on('click', () => {
         removeSearchBox();
-    
         insertFullComponent(contact)
             .then(addFinalSpace)
-            .then((c) => { return addContactsToCC([c]); });
-    })
+            .then((c) => { return addContacts([c]); });
+    });
     return c;
  }
 
@@ -226,24 +205,14 @@ function addFinalSpace(contact) {
 // Inserts Mention on the body
 function insertFullComponent(contact) {
 
-    const inject = new Promise((resolve, reject) => {
-
-        // Properties brought from the Popup.
-        let url = "mailto:" + contact.email;
-        let name = contact.name;
-        let email = contact.email;
-        let id = generateLinkId();
-
-        let span = document.createElement('span');
-
+    const inject = new Promise((resolve, _) => {
         // Build component to be added to the body.
+        let span = document.createElement('span');
         let str = document.createElement('a');
-        str.setAttribute('href', url);
-        str.setAttribute('data-email', email);
-        str.setAttribute('data-name', name);
+        str.setAttribute('href', "mailto:" + contact.email);
         
-        str.id = id;
-        str.innerText = '@' + name;
+        str.id = contact.id;
+        str.innerText = '@' + contact.name;
 
         span.append(str);
 
@@ -257,14 +226,5 @@ function insertFullComponent(contact) {
         resolve(contact);
     });
 
-    return inject;    
-}
-
-function generateLinkId() {
-    return "OWAAM" +
-        ([1e7]+1e3+4e3+8e3+1e11)
-            .replace(/[018]/g, c => (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4)
-            .toString(16)
-            .toUpperCase()) +
-        "Z";
+    return inject;
 }

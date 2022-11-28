@@ -1,4 +1,5 @@
 // Background.js
+console.log('@Contact Mention - Background Script loaded.');
 
 // Agregation
 let contacts = [];
@@ -19,12 +20,6 @@ let mailinglists = [];
 
     // Get all the contacts up.
     compactBooks();
-
-    // Listen to the Action button
-    addComposeActionListener();
-
-    // Disable the Button if there is no contacts
-    addComposerActionDisablerListener();
 
     // Listen for the order to open the popup!
     browser.runtime.onMessage.addListener(handleMessage);
@@ -51,16 +46,16 @@ async function compactBooks() {
 
 // Handle the Popup Message
 async function handleMessage(request, sender) {
-    if(request.searchContact ){
+    if(request.searchContact) {
         let val = request.searchContact;
         let results = searchResults(val);
         return Promise.resolve(results);
-    } else if(request.addContactsToCC ) {
+    } else if(request.addContacts) {
         // Add the Contact to BCC now.
-        return addContactToAddressLine(sender.tab.id, request.addContactsToCC)
+        return addContactToAddressLine(sender.tab.id, request.addContacts)
     } else {
         // Listen to the Popup with the final anwser   
-        console.log('Another Message received from Popup.');
+        console.log('Another Message received from Popup.', request);
     }
 }
 
@@ -75,25 +70,19 @@ function searchResults(v) {
        } else {
           return false;
        }
-    })
+    }).map(x => {
+        return {
+            id: generateMentionId(),
+            name: x.properties.DisplayName,
+            email: x.properties.PrimaryEmail
+        };
+    });
  
     return results;
  }
 
 // Listen to the Compose Action Button
-function addComposerActionDisablerListener() {
-    browser.tabs.onCreated.addListener(tab => {
-        // Check if there are contacts...
-        if(contacts.length == 0) {
-            // Disable the button.
-            browser.composeAction.disable(tab.id);
-            browser.composeAction.setTitle({ 
-                tabId: tab.id, 
-                title: 'No contacts!'
-            });
-        }
-    })
-
+function addAddressBookListeners() {
     // This is that when an addressBook is created, we 
     // re compact the contacts.
     browser.addressBooks.onCreated.addListener(addressBook => {
@@ -113,71 +102,52 @@ function addComposerActionDisablerListener() {
     })
 }
 
-// Listen to the Compose Action Button
-function addComposeActionListener() {
-    browser.composeAction.onClicked.addListener(tab => {
-        let tabId = tab.id;
-
-        // Message the Composer for the Contacts.
-        addContactToAddressLine(tabId); 
-    });
-}
-
 // Add Contacts to the CC of the Compose Window.
-async function addContactToAddressLine(tabId, contactsArrived = []) {
+async function addContactToAddressLine(tabId, contacts = []) {
 
     // Gather the compose details to add contacts.
     let details = await messenger.compose.getComposeDetails(tabId);
     
     // Is this a compose window?
-    if(details) {
+    if(!details)
+        return Promise.resolve(contacts);
 
-        let body = details.body;
-        let document = new DOMParser().parseFromString(details.body, "text/html");
+    // Add the contacts to the CC
+    for(var i = 0; i < contacts.length; i++) {
+        let contact = contacts[i];
+        
+        console.log("Adding contact", contact);
 
-        let contacts = document.getElementsByClassName('mentionContact');
+        let email = contact.email;
+        let name = contact.name;
 
-        // Add the contacts to the CC
-        for(var i=0; i<contacts.length; i++) {
-            let contact = contacts[i];
+        let to = details.to;
+        let cc = details.cc;
+        let bcc = details.bcc;
 
-            let email = contact.getAttribute('data-email');
-            let name = contact.getAttribute('data-name');
+        // Check if email is already in the list of receivers
+        if(to.filter((n) => { return (n.indexOf(email) > 0); }).length ||
+           cc.filter((n) => { return (n.indexOf(email) > 0); }).length)
+            continue;
 
-            let to = details.to;
-            let cc = details.cc;
-            let bcc = details.bcc;
+        // Add contact
+        to.push(name + ' <' + email + '>');    
 
-            let foundTo = false;
-            let foundCC = false;
-            let foundBCC = false;
-
-            // first find it on the To.
-            if(to.filter((n) => { return (n.indexOf(email) > 0); }).length) {
-                foundTo = true;
-            }
-
-            // first find it on the CC.
-            if(cc.filter((n) => { return (n.indexOf(email) > 0); }).length) {
-                foundCC = true;
-            }
-
-            // first find it on the BCC.
-            if(bcc.filter((n) => { return (n.indexOf(email) > 0); }).lenght) {
-                foundBCC = false;
-            }
-
-            if(!foundCC && !foundTo && !foundBCC ) {
-                cc.push(name + ' <' + email + '>');    
-            }
-
-            // Set the Details back again.
-            await messenger.compose.setComposeDetails(tabId, {
-                to, cc, bcc
-            });
-        }
+        // Set the Details back again.
+        await messenger.compose.setComposeDetails(tabId, {
+            to, cc, bcc
+        });
     }
 
     // Return the contacts for next thing (if any).
-    return Promise.resolve(contactsArrived);
+    return Promise.resolve(contacts);
+}
+
+function generateMentionId() {
+    return "OWAAM" +
+        ([1e7]+1e3+4e3+8e3+1e11)
+            .replace(/[018]/g, c => (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4)
+            .toString(16)
+            .toUpperCase()) +
+        "Z";
 }
