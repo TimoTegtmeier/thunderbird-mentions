@@ -1,17 +1,32 @@
 console.log('@Contact Mention - Compose Script loaded.');
 
-let books = [];
-
 (() => {
     document.body.addEventListener('keydown', onKeyDown);
+    document.body.addEventListener('keyup', onKeyUp);
+    document.body.addEventListener('click', onClick);
 })();
-
-// Keep track of the last key pressed.
-let lastChar = '';
 
 // Search control
 let results = [];
 let resultsIndex = 0;
+let shouldUpdateSearch = false;
+
+let lastFocusNode = null;
+let lastFocusOffset = null;
+
+function saveSelection() {
+    let selection = document.getSelection();
+    lastFocusNode = selection.focusNode;
+    lastFocusOffset = selection.focusOffset;
+}
+
+function onClick(event) {
+    if($(event.target).hasClass('contact'))
+        return;
+
+    console.log('outside click detected - removing search box');
+    removeSearchBox();
+}
 
 // Track keystrokes.
 async function onKeyDown(event) {
@@ -20,15 +35,17 @@ async function onKeyDown(event) {
 
     if(searchBoxExist) {
         let key = event.key;
-        let input = document.getElementById('searchContact');
-        let isPrintableCharacter = String.fromCharCode(event.keyCode).match(/(\w|\s)/g);
+        let stopPropagation = false;
 
-        // Don't print the key on the body.
-        event.stopPropagation();
-        event.preventDefault();
-        
-        if(key === 'Escape' || key === 'Tab' || key === 'Delete') {
+        if(shouldStopSearching(key)) {
             removeSearchBox();
+        } else if(key === 'Enter') {
+            if(results.length > 0) {
+                $('#am-li-' + results[resultsIndex].id).trigger('click');
+                stopPropagation = true;
+            } else {
+                removeSearchBox();
+            }
         } else if(key === 'ArrowDown' && results.length) {
             // Move down on the list.
             resultsIndex = (resultsIndex < results.length - 1) ? resultsIndex + 1 : 0;
@@ -37,40 +54,23 @@ async function onKeyDown(event) {
             // Move up on the list.
             resultsIndex = (resultsIndex > 0) ? resultsIndex - 1 : results.length - 1;
             markResult();
-        } else if(key === 'Backspace') {
-            if(input.value.length > 0) {
-                input.setAttribute('value', input.value.slice(0, input.value.length - 1));
-            } else {
-                // Close the Searchbox.
-                removeSearchBox();
-            }
-        } else if(key === 'Space' || key === ' ') {
-            // Only add Space after the first letter.
-            if(input.value.length > 0) {
-                input.setAttribute('value', input.value + ' ');
-            }
-        } else if(key === 'Enter') {
-            if(results.length > 0) {
-                $('#am-li-' + results[resultsIndex].id).trigger('click');
-            } 
-        } else if(isPrintableCharacter) {
-            // Print the key on the box.
-            input.setAttribute('value', input.value + key);
+        } else {
+            shouldUpdateSearch = true;
+        }
 
-            let val = input.value;
-            if(val.length >= 3) {
-                // Search when the box is over 3 characters
-                cleanResults();
-                results = await searchResults(val);
-                await listResults(results);
-                markResult();
-            }
+        if(stopPropagation) {
+            event.stopPropagation();
+            event.preventDefault();
         }
     } else {
-        if((lastChar === ' ' || lastChar === 'Enter' || lastChar ==='Tab' || lastChar === '') && event.key === '@') {
+        if(event.key === '@') {
+
+            saveSelection();
 
             // Get the context of the cursor.
-            let selection = document.getSelection().focusNode;
+            let selection = lastFocusNode;
+            if(!selection)
+                return;
 
             // If no selection, then come up a node.
             if(selection.nodeName === '#text' || selection.nodeName === 'TEXT') {
@@ -78,37 +78,56 @@ async function onKeyDown(event) {
             }
 
             insertSearchBox(selection);
-            
-            // Don't print the @
-            event.stopPropagation();
-            event.preventDefault();
-        }
-
-        // Forget other key presses that don't affect the content.
-        let ignoreKey = event.key == 'Shift' || event.key == 'OS' || event.key == 'Alt' || event.key == 'AltGraph' || event.key == 'Control';
-        if(!ignoreKey) {
-            lastChar = event.key;
         }
     }
     return false;
 }
 
+function onKeyUp(_) {
+    if(!shouldUpdateSearch)
+        return false;
+
+    shouldUpdateSearch = false;
+    Promise
+        .resolve()
+        .then(() => updateSearchTerm());
+
+    return false;
+}
+
+function shouldStopSearching(key) {
+    return key === ' ' || key === 'Escape' || key === 'Space' || key === 'Tab';
+}
+
+async function updateSearchTerm() {
+    saveSelection();
+
+    let text = lastFocusNode.textContent.substring(0, lastFocusOffset);
+    text = text.substring(text.lastIndexOf('@') + 1);
+
+    cleanResults();
+
+    if(text.length >= 2) {
+        results = await searchResults(text);
+        await listResults(results);
+        markResult();
+    }
+}
+
 // Send Message to add contact.
 function addContacts(contacts) {
-    console.log("Adding contacts", contacts);
     return browser.runtime.sendMessage({ addContacts: contacts });
 }
 
 // Ask background for matches.
 async function searchResults(v) {
     let resultContacts = await browser.runtime.sendMessage({ searchContact: v });
-    console.log("Found contacts", resultContacts);
     return resultContacts;
  }
 
 // Remove the Search Box.
 function removeSearchBox() {
-    document.getElementById('searchBox').remove();
+    document.getElementById('searchBox')?.remove();
 }
 
 // Clean Results from Search
@@ -149,6 +168,7 @@ async function buildContact(contact) {
     let c = document.createElement('li');
     c.id = "am-li-" + contact.id;
     c.className = 'contact';
+    c.tabIndex = -1;
     c.innerHTML = contact.name + ' (' + contact.email + ')';
  
     $(c).on('click', () => {
@@ -161,27 +181,18 @@ async function buildContact(contact) {
  }
 
 function insertSearchBox(obj) {
-
     let wrapper = document.createElement('span');
     wrapper.id = 'searchBox';
     wrapper.className = 'searchBox';
+    wrapper.tabIndex = -1;
+    wrapper.setAttribute('contenteditable', false);
     
-    let at = document.createElement('label');
-    at.innerHTML = '@';
-    at.style = 'border: 0px;';
-
-    let input = document.createElement('input');
-    input.setAttribute('type', 'text');
-    input.id = 'searchContact';
-    input.setAttribute('style', 'border: 0px solid white; width: auto;');
-
     let box = document.createElement('div');
     box.id = 'resultsWrapper';
-    $(box).html('<ul id="results" class="results"><li class="contact">Search for contact...</li></ul>');
+    box.tabIndex = -1;
+    $(box).html('<ul id="results" class="results" tabindex="-1"></ul>');
 
     wrapper.append(box);
-    wrapper.append(at);
-    wrapper.append(input);
 
     // Append to Focus Node.
     $(obj.lastElementChild).before(wrapper);
@@ -205,7 +216,23 @@ function addFinalSpace(contact) {
 // Inserts Mention on the body
 function insertFullComponent(contact) {
 
-    const inject = new Promise((resolve, _) => {
+    const inject = new Promise((resolve, reject) => {
+        if(!lastFocusNode)
+            reject();
+
+        let text = lastFocusNode.textContent.substring(0, lastFocusOffset);
+        text = text.substring(text.lastIndexOf('@'));
+    
+        let range = document.createRange();
+        range.selectNode(lastFocusNode);
+        range.endOffset = lastFocusOffset;
+        range.startOffset = lastFocusOffset - text.length;
+
+        let selection = document.getSelection();
+        selection.addRange(range);
+        selection.deleteFromDocument();
+        selection.collapseToEnd();
+
         // Build component to be added to the body.
         let span = document.createElement('span');
         let str = document.createElement('a');
