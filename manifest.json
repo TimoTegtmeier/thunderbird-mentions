@@ -3,11 +3,11 @@
   "name": "@Contact Mention",
   "description": "Use @ to mention somebody on an email.",
   "version": "0.7.0",
-  "author": "Joaquin Ayuso de Paul, Timo Tegtmeier",
+  "author": "Timo Tegtmeier, Joaquin Ayuso de Paul",
   "applications": {
     "gecko": {
       "id": "{2af208f6-fdc2-4c74-8db9-bb4a8de6359d}",
-      "strict_min_version": "102.0.0"
+      "strict_min_version": "102.0"
     }
   },
   "background": {
