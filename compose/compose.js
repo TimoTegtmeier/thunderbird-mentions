@@ -15,7 +15,6 @@ let shouldUpdateSearch = false;
 let lastFocusNode = null;
 let lastFocusOffset = null;
 
-
 // Track keystrokes.
 async function onKeyDown(event) {
     
@@ -25,11 +24,11 @@ async function onKeyDown(event) {
         let key = event.key;
         let stopPropagation = false;
 
-        if(shouldStopSearching(key)) {
+        if(shouldStopSearch(key)) {
             removeSearchBox();
         } else if(key === 'Enter') {
             if(results.length > 0) {
-                document.getElementById('#am-li-' + results[resultsIndex].id).click();
+                document.getElementById('am-li-' + results[resultsIndex].id)?.click();
                 stopPropagation = true;
             } else {
                 removeSearchBox();
@@ -38,10 +37,12 @@ async function onKeyDown(event) {
             // Move down on the list.
             resultsIndex = (resultsIndex < results.length - 1) ? resultsIndex + 1 : 0;
             markResult();
+            stopPropagation = true;
         } else if(key === 'ArrowUp' && results.length) {
             // Move up on the list.
             resultsIndex = (resultsIndex > 0) ? resultsIndex - 1 : results.length - 1;
             markResult();
+            stopPropagation = true;
         } else {
             shouldUpdateSearch = true;
         }
@@ -84,13 +85,13 @@ function onKeyUp(_) {
 
 // Track clicks outside of the result list
 function onClickOutside(event) {
-    if($(event.target).hasClass('am-contact'))
+    if(event.target?.classList?.contains('am-contact'))
         return;
 
     removeSearchBox();
 }
 
-// Remember current focus
+// Remember current text focus
 function rememberFocus() {
     let selection = document.getSelection();
     lastFocusNode = selection.focusNode;
@@ -98,7 +99,7 @@ function rememberFocus() {
 }
 
 // Returns true, if the key hit should stop the search
-function shouldStopSearching(key) {
+function shouldStopSearch(key) {
     return key === ' ' || key === 'Escape' || key === 'Space' || key === 'Tab';
 }
 
@@ -156,7 +157,10 @@ function cleanResults() {
  
  // Clear any marked results.
  async function clearMarkedResults() {
-    $('li.am-contact').removeClass('am-selected');
+    let selected = document.getElementsByClassName('am-selected');
+    for(var item of selected) {
+        item.classList.remove('am-selected');
+    }
  }
  
  // Mark a result from the list.
@@ -165,8 +169,8 @@ function cleanResults() {
  
     // If there are results, then mark.
     if(results.length) {
-        let l = document.getElementById("am-li-" + results[resultsIndex].id);   
-        $(l).addClass('am-selected');
+        let l = document.getElementById("am-li-" + results[resultsIndex].id);
+        l.classList.add('am-selected');
     }
  }
 
@@ -208,7 +212,7 @@ function insertSearchBox(obj) {
     wrapper.appendChild(box);
 
     // Append to Focus Node.
-    $(obj.lastElementChild).before(wrapper);
+    obj.insertBefore(wrapper, obj.lastElementChild);
 
     return true;
 }

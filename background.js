@@ -9,7 +9,6 @@ console.log('@Contact Mention - Background Script loaded.');
             {file: '/compose/compose.css'},
         ],
         js: [
-            {file: "/jquery.min.js"}, 
             {file: "/compose/compose.js"},
         ]
     });
@@ -24,7 +23,6 @@ async function handleMessage(request, sender) {
     if(request.searchContact) {
         let val = request.searchContact;
         let results = await searchResults(val);
-        console.log(results);
         return Promise.resolve(results);
     } else if(request.addContacts) {
         // Add the Contact to BCC now.
@@ -63,8 +61,6 @@ async function addContactToAddressLine(tabId, contacts = []) {
     for(var i = 0; i < contacts.length; i++) {
         let contact = contacts[i];
         
-        console.log("Adding contact", contact);
-
         let email = contact.email;
         let name = contact.name;
 
