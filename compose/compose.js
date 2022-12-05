@@ -3,7 +3,7 @@ console.log('@Contact Mention - Compose Script loaded.');
 (() => {
     document.body.addEventListener('keydown', onKeyDown);
     document.body.addEventListener('keyup', onKeyUp);
-    document.body.addEventListener('click', onClick);
+    document.body.addEventListener('click', onClickOutside);
 })();
 
 // Search control
@@ -11,27 +11,15 @@ let results = [];
 let resultsIndex = 0;
 let shouldUpdateSearch = false;
 
+// Remember last focused node and last focus offset
 let lastFocusNode = null;
 let lastFocusOffset = null;
 
-function saveSelection() {
-    let selection = document.getSelection();
-    lastFocusNode = selection.focusNode;
-    lastFocusOffset = selection.focusOffset;
-}
-
-function onClick(event) {
-    if($(event.target).hasClass('contact'))
-        return;
-
-    console.log('outside click detected - removing search box');
-    removeSearchBox();
-}
 
 // Track keystrokes.
 async function onKeyDown(event) {
     
-    let searchBoxExist = document.getElementById('searchBox');
+    let searchBoxExist = document.getElementById('am-searchBox');
 
     if(searchBoxExist) {
         let key = event.key;
@@ -41,7 +29,7 @@ async function onKeyDown(event) {
             removeSearchBox();
         } else if(key === 'Enter') {
             if(results.length > 0) {
-                $('#am-li-' + results[resultsIndex].id).trigger('click');
+                document.getElementById('#am-li-' + results[resultsIndex].id).click();
                 stopPropagation = true;
             } else {
                 removeSearchBox();
@@ -65,7 +53,7 @@ async function onKeyDown(event) {
     } else {
         if(event.key === '@') {
 
-            saveSelection();
+            rememberFocus();
 
             // Get the context of the cursor.
             let selection = lastFocusNode;
@@ -83,24 +71,39 @@ async function onKeyDown(event) {
     return false;
 }
 
+// Handle updating the search term
 function onKeyUp(_) {
-    if(!shouldUpdateSearch)
-        return false;
-
+    if(shouldUpdateSearch)
+        Promise
+            .resolve()
+            .then(() => updateSearchTerm());
     shouldUpdateSearch = false;
-    Promise
-        .resolve()
-        .then(() => updateSearchTerm());
 
     return false;
 }
 
+// Track clicks outside of the result list
+function onClickOutside(event) {
+    if($(event.target).hasClass('am-contact'))
+        return;
+
+    removeSearchBox();
+}
+
+// Remember current focus
+function rememberFocus() {
+    let selection = document.getSelection();
+    lastFocusNode = selection.focusNode;
+    lastFocusOffset = selection.focusOffset;
+}
+
+// Returns true, if the key hit should stop the search
 function shouldStopSearching(key) {
     return key === ' ' || key === 'Escape' || key === 'Space' || key === 'Tab';
 }
 
 async function updateSearchTerm() {
-    saveSelection();
+    rememberFocus();
 
     let text = lastFocusNode.textContent.substring(0, lastFocusOffset);
     text = text.substring(text.lastIndexOf('@') + 1);
@@ -127,29 +130,33 @@ async function searchResults(v) {
 
 // Remove the Search Box.
 function removeSearchBox() {
-    document.getElementById('searchBox')?.remove();
+    document.getElementById('am-searchBox')?.remove();
 }
 
 // Clean Results from Search
 function cleanResults() {
     results = [];
     resultsIndex = 0;
-    document.getElementById('results').innerHTML = '';
+
+    const el = document.getElementById('am-results');
+    while(el.firstChild) {
+        el.removeChild(el.firstChild);
+    }
  }
  
  // List results on the box.
  async function listResults(contacts) {
     // Mark the Box...
-    let list = document.getElementById('results');
+    let list = document.getElementById('am-results');
     for(var contact of contacts) {
        let result = await buildContact(contact);
-       $(list).append(result);
+       list.appendChild(result);
     }
  }
  
  // Clear any marked results.
  async function clearMarkedResults() {
-    $('li.contact').removeClass('selected');
+    $('li.am-contact').removeClass('am-selected');
  }
  
  // Mark a result from the list.
@@ -159,7 +166,7 @@ function cleanResults() {
     // If there are results, then mark.
     if(results.length) {
         let l = document.getElementById("am-li-" + results[resultsIndex].id);   
-        $(l).addClass('selected');
+        $(l).addClass('am-selected');
     }
  }
 
@@ -167,11 +174,10 @@ function cleanResults() {
 async function buildContact(contact) {
     let c = document.createElement('li');
     c.id = "am-li-" + contact.id;
-    c.className = 'contact';
+    c.className = 'am-contact';
     c.tabIndex = -1;
     c.innerHTML = contact.name + ' (' + contact.email + ')';
- 
-    $(c).on('click', () => {
+    c.addEventListener('click', () => {
         removeSearchBox();
         insertFullComponent(contact)
             .then(addFinalSpace)
@@ -182,17 +188,24 @@ async function buildContact(contact) {
 
 function insertSearchBox(obj) {
     let wrapper = document.createElement('span');
-    wrapper.id = 'searchBox';
-    wrapper.className = 'searchBox';
+    wrapper.id = 'am-searchBox';
+    wrapper.className = 'am-searchBox';
     wrapper.tabIndex = -1;
-    wrapper.setAttribute('contenteditable', false);
+    wrapper.contentEditable = false;
     
     let box = document.createElement('div');
-    box.id = 'resultsWrapper';
+    box.id = 'am-resultsWrapper';
     box.tabIndex = -1;
-    $(box).html('<ul id="results" class="results" tabindex="-1"></ul>');
+    box.contentEditable = false;
 
-    wrapper.append(box);
+    let list = document.createElement('ul');
+    list.id = 'am-results';
+    list.className = 'am-results';
+    list.tabIndex = -1;
+    list.contentEditable = false;
+
+    box.appendChild(list);
+    wrapper.appendChild(box);
 
     // Append to Focus Node.
     $(obj.lastElementChild).before(wrapper);
@@ -203,10 +216,10 @@ function insertSearchBox(obj) {
 // Inserts a final space.
 function addFinalSpace(contact) {
     // And the space afterwards
-    const inject = new Promise((resolve, reject) => {
+    const inject = new Promise((resolve, _) => {
         // Add Space in the end to continue writting.
         document.getSelection().collapseToEnd();
-        $(document.body).trigger('focus');
+        document.body.focus();
         resolve(contact);
     })
 
