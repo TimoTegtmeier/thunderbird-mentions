@@ -180,7 +180,7 @@ async function buildContact(contact) {
     c.id = "am-li-" + contact.id;
     c.className = 'am-contact';
     c.tabIndex = -1;
-    c.innerHTML = contact.name + ' (' + contact.email + ')';
+    c.innerText = contact.name + ' (' + contact.email + ')';
     c.addEventListener('click', () => {
         removeSearchBox();
         insertFullComponent(contact)
