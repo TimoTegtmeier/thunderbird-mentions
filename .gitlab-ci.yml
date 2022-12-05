@@ -1,0 +1,8 @@
+build:
+  stage: build
+  script:
+    - zip -r @contact-mentions.xpi * -x "preview*" -x "*.xpi" -x "README.md" -x ".git*"
+  only:
+    - master
+  tags:
+    - linux
