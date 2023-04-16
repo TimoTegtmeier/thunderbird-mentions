@@ -26,7 +26,9 @@ async function handleMessage(request, sender) {
         return Promise.resolve(results);
     } else if(request.addContacts) {
         // Add the Contact to BCC now.
-        return addContactToAddressLine(sender.tab.id, request.addContacts)
+        return addContactToAddressLine(sender.tab.id, request.addContacts);
+    } else if(request.debugLog) {
+        console.log.apply(console, request.debugLog);
     } else {
         // Listen to the Popup with the final anwser   
         console.log('Another Message received from Popup.', request);
