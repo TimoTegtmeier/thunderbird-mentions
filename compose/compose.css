@@ -31,6 +31,7 @@
 span.am-searchBox {
     border: 0px;
     display: inline-block;
+    user-select: none;
 }
 
 #am-resultsWrapper {
