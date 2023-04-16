@@ -1,9 +1,11 @@
-console.log('@Contact Mention - Compose Script loaded.');
+debugLog('@Contact Mention - Compose Script loaded.');
 
 (() => {
     document.body.addEventListener('keydown', onKeyDown);
     document.body.addEventListener('keyup', onKeyUp);
     document.body.addEventListener('click', onClickOutside);
+
+    debugLog("document: focus?", document.hasFocus());
 })();
 
 // Search control
@@ -12,12 +14,26 @@ let resultsIndex = 0;
 let shouldUpdateSearch = false;
 
 // Remember last focused node and last focus offset
-let lastFocusNode = null;
-let lastFocusOffset = null;
+let anchorNode = null;
+let anchorOffset = null;
+let focusOffset = null;
+
+function reset() {
+    results = [];
+    resultsIndex = 0;
+    shouldUpdateSearch = false;
+
+    anchorNode = null;
+    anchorOffset = null;
+    focusOffset = null;
+
+    document.getElementById('am-searchBox')?.remove();
+}
 
 // Track keystrokes.
-async function onKeyDown(event) {
+function onKeyDown(event) {
     
+    debugLog("Keydownevent", event);
     let searchBoxExist = document.getElementById('am-searchBox');
 
     if(searchBoxExist) {
@@ -25,13 +41,14 @@ async function onKeyDown(event) {
         let stopPropagation = false;
 
         if(shouldStopSearch(key)) {
-            removeSearchBox();
+            reset();
+            stopPropagation = true;
         } else if(key === 'Enter') {
             if(results.length > 0) {
                 document.getElementById('am-li-' + results[resultsIndex].id)?.click();
                 stopPropagation = true;
             } else {
-                removeSearchBox();
+                reset();
             }
         } else if(key === 'ArrowDown' && results.length) {
             // Move down on the list.
@@ -51,29 +68,17 @@ async function onKeyDown(event) {
             event.stopPropagation();
             event.preventDefault();
         }
-    } else {
-        if(event.key === '@') {
-
-            rememberFocus();
-
-            // Get the context of the cursor.
-            let selection = lastFocusNode;
-            if(!selection)
-                return;
-
-            // If no selection, then come up a node.
-            if(selection.nodeName === '#text' || selection.nodeName === 'TEXT') {
-                selection = selection.parentNode;
-            }
-
-            insertSearchBox(selection);
-        }
+    } else if(event.key === '@') {
+        rememberFocus();
+        insertSearchBox();
     }
     return false;
 }
 
 // Handle updating the search term
 function onKeyUp(_) {
+    debugLog("Keyupevent", _);
+
     if(shouldUpdateSearch)
         Promise
             .resolve()
@@ -88,27 +93,40 @@ function onClickOutside(event) {
     if(event.target?.classList?.contains('am-contact'))
         return;
 
-    removeSearchBox();
+    reset();
 }
 
 // Remember current text focus
 function rememberFocus() {
     let selection = document.getSelection();
-    lastFocusNode = selection.focusNode;
-    lastFocusOffset = selection.focusOffset;
+    anchorNode = selection.anchorNode;
+    anchorOffset = selection.anchorOffset;
+    focusOffset = selection.focusOffset;
+
+    debugLog("Remebered position", anchorOffset, focusOffset)
+}
+
+function getSearchText() {
+    if (!anchorNode)
+        return "";
+
+    let text = anchorNode.textContent.substring(anchorOffset, focusOffset);
+    if (text.indexOf('@') == 0)
+        text = text.substring(1);
+    
+    return text;
 }
 
 // Returns true, if the key hit should stop the search
 function shouldStopSearch(key) {
-    return key === ' ' || key === 'Escape' || key === 'Space' || key === 'Tab';
+    return key === ' ' || key === 'Escape' || key === 'Tab' || key == '@';
 }
 
 async function updateSearchTerm() {
-    rememberFocus();
+    focusOffset = document.getSelection().focusOffset;
+    let text = getSearchText();
 
-    let text = lastFocusNode.textContent.substring(0, lastFocusOffset);
-    text = text.substring(text.lastIndexOf('@') + 1);
-
+    debugLog('Search term is', text);
     cleanResults();
 
     if(text.length >= 2) {
@@ -127,11 +145,6 @@ function addContacts(contacts) {
 async function searchResults(v) {
     let resultContacts = await browser.runtime.sendMessage({ searchContact: v });
     return resultContacts;
- }
-
-// Remove the Search Box.
-function removeSearchBox() {
-    document.getElementById('am-searchBox')?.remove();
 }
 
 // Clean Results from Search
@@ -176,99 +189,94 @@ function cleanResults() {
 
 // Builds a contact.
 async function buildContact(contact) {
-    let c = document.createElement('li');
-    c.id = "am-li-" + contact.id;
-    c.className = 'am-contact';
-    c.tabIndex = -1;
-    c.innerText = contact.name + ' (' + contact.email + ')';
-    c.addEventListener('click', () => {
-        removeSearchBox();
-        insertFullComponent(contact)
-            .then(addFinalSpace)
-            .then((c) => { return addContacts([c]); });
-    });
-    return c;
- }
+    let li = document.createElement('li');
+    li.id = "am-li-" + contact.id;
+    li.className = 'am-contact';
+    li.tabIndex = -1;
+    li.innerText = contact.name + ' (' + contact.email + ')';
+    li.addEventListener('click', () => {
+        document.execCommand("undo", false);
+        focusOffset = document.getSelection().focusOffset
 
-function insertSearchBox(obj) {
-    let wrapper = document.createElement('span');
+        addContacts([contact]);
+        insertMention(contact);
+        reset();
+    });
+    return li;
+}
+
+function getSearchBoxPosition() {
+    let selection = window.getSelection();
+    let getRange = selection.getRangeAt(0); 
+    let rect = getRange.getBoundingClientRect();
+    var height = rect.height;
+
+    if (selection.anchorNode instanceof Element) {
+        let fs = window.getComputedStyle(selection.anchorNode, null).getPropertyValue('font-size');
+        height = Math.max(parseInt(fs) + 1, height)
+    }
+
+    return {
+        x: parseInt(rect.x),
+        y: parseInt(Math.max(rect.y, 8) + height - 11)
+    }
+}
+
+function insertSearchBox() {
+    let pos = getSearchBoxPosition();
+
+    let wrapper = document.createElement('div');
     wrapper.id = 'am-searchBox';
     wrapper.className = 'am-searchBox';
     wrapper.tabIndex = -1;
-    wrapper.contentEditable = false;
+    wrapper.contenteditable = "false";
+    wrapper.style.position = "absolute";
+    wrapper.style.top = pos.y + "px";
+    wrapper.style.left = pos.x + "px";
     
     let box = document.createElement('div');
     box.id = 'am-resultsWrapper';
     box.tabIndex = -1;
-    box.contentEditable = false;
+    box.contenteditable = "false";
 
     let list = document.createElement('ul');
     list.id = 'am-results';
     list.className = 'am-results';
     list.tabIndex = -1;
-    list.contentEditable = false;
+    list.contenteditable = "false";
 
     box.appendChild(list);
     wrapper.appendChild(box);
 
     // Append to Focus Node.
-    obj.insertBefore(wrapper, obj.lastElementChild);
-
-    return true;
-}
-
-// Inserts a final space.
-function addFinalSpace(contact) {
-    // And the space afterwards
-    const inject = new Promise((resolve, _) => {
-        // Add Space in the end to continue writting.
-        document.getSelection().collapseToEnd();
-        document.body.focus();
-        resolve(contact);
-    })
-
-    return inject;
+    document.body.append(wrapper);
 }
 
 // Inserts Mention on the body
-function insertFullComponent(contact) {
+function insertMention(contact) {
+    if(!anchorNode)
+        return;
 
-    const inject = new Promise((resolve, reject) => {
-        if(!lastFocusNode)
-            reject();
-
-        let text = lastFocusNode.textContent.substring(0, lastFocusOffset);
-        text = text.substring(text.lastIndexOf('@'));
+    // Build component to be added to the body.
+    let anchor = document.createElement('a');
+    anchor.setAttribute('href', "mailto:" + contact.email);
     
-        let range = document.createRange();
-        range.selectNode(lastFocusNode);
-        range.endOffset = lastFocusOffset;
-        range.startOffset = lastFocusOffset - text.length;
+    anchor.id = contact.id;
+    anchor.innerText = '@' + contact.name;
 
-        let selection = document.getSelection();
-        selection.addRange(range);
-        selection.deleteFromDocument();
-        selection.collapseToEnd();
+    if (focusOffset > anchorOffset) {
+        for(var i = 0; i < focusOffset - anchorOffset; i++)
+            document.execCommand("delete", false);
+    }
+    document.execCommand("insertHTML", false, anchor.outerHTML);
+    document.execCommand("insertText", false, " ");
 
-        // Build component to be added to the body.
-        let span = document.createElement('span');
-        let str = document.createElement('a');
-        str.setAttribute('href', "mailto:" + contact.email);
-        
-        str.id = contact.id;
-        str.innerText = '@' + contact.name;
+    anchorNode = null;
+    anchorOffset = null;
+    focusOffset = null;
+}
 
-        span.append(str);
-
-        // What if...
-        document.execCommand("insertHTML", false, span.outerHTML);
-
-        // Final Space.
-        document.execCommand("insertText", false, ' ');
-
-        // Return control to Script
-        resolve(contact);
-    });
-
-    return inject;
+function debugLog(...args) {
+    console.log.apply(console, args);
+    browser.runtime.sendMessage({ debugLog: args.map(function(x) { return "" + x; }) });
 }
